@@ -10,3 +10,10 @@ Shop-Shop is an e-commerce app built using React and, it was adapted to use Redu
 Visit the live site!
 
 https://myreduxstore.herokuapp.com/
+
+
+#Questions
+
+If you have more questions about this application, you can contact me by:
+  email: kassim.huggins@gmail.com
+  Github: khuggins1

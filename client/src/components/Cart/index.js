@@ -5,14 +5,20 @@ import { QUERY_CHECKOUT } from "../../utils/queries"
 import { idbPromise } from "../../utils/helpers"
 import CartItem from "../CartItem";
 import Auth from "../../utils/auth";
-import { useStoreContext } from "../../utils/GlobalState";
 import { TOGGLE_CART, ADD_MULTIPLE_TO_CART } from "../../utils/actions";
 import "./style.css";
-
-const stripePromise = loadStripe('pk_test_TYooMQauvdEDq54NiTphI7jx');
+import { useDispatch, useSelector} from 'react-redux';
 
 const Cart = () => {
-  const [state, dispatch] = useStoreContext();
+
+  const state = useSelector ((state) => {
+    return state;
+  });
+
+  const dispatch = useDispatch();
+
+  const stripePromise = loadStripe('pk_test_TYooMQauvdEDq54NiTphI7jx');
+
   const [getCheckout, { data }] = useLazyQuery(QUERY_CHECKOUT);
 
   useEffect(() => {
@@ -28,11 +34,11 @@ const Cart = () => {
       const cart = await idbPromise('cart', 'get');
       dispatch({ type: ADD_MULTIPLE_TO_CART, products: [...cart] });
     };
-
     if (!state.cart.length) {
       getCart();
     }
   }, [state.cart.length, dispatch]);
+
 
   function toggleCart() {
     dispatch({ type: TOGGLE_CART });
@@ -48,14 +54,13 @@ const Cart = () => {
 
   function submitCheckout() {
     const productIds = [];
-
     state.cart.forEach((item) => {
       for (let i = 0; i < item.purchaseQuantity; i++) {
         productIds.push(item._id);
       }
     });
 
-    getCheckout({
+    getCheckout ({
       variables: { products: productIds }
     });
   }
@@ -87,7 +92,7 @@ const Cart = () => {
               Auth.loggedIn() ?
                 <button onClick={submitCheckout}>
                   Checkout
-              </button>
+                </button>
                 :
                 <span>(log in to check out)</span>
             }

@@ -1,53 +1,113 @@
-import React from "react";
-import { BrowserRouter as Router, Route, Switch } from "react-router-dom";
-import { ApolloProvider } from '@apollo/react-hooks';
-import ApolloClient from 'apollo-boost';
-import Success from './pages/Success'
-import Home from "./pages/Home";
-import Detail from "./pages/Detail";
-import NoMatch from "./pages/NoMatch";
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
-import Nav from "./components/Nav";
-// import { StoreProvider } from "./utils/GlobalState";
-import OrderHistory from "./pages/OrderHistory";
-import store from './utils/store';
-import { Provider } from 'react-redux';
+import React, { useEffect } from "react";
+import { loadStripe } from "@stripe/stripe-js";
+import { useLazyQuery } from '@apollo/react-hooks';
+import { QUERY_CHECKOUT } from "../../utils/queries"
+import { idbPromise } from "../../utils/helpers"
+import CartItem from "../CartItem";
+import Auth from "../../utils/auth";
+import { TOGGLE_CART, ADD_MULTIPLE_TO_CART } from "../../utils/actions";
+import "./style.css";
+import { useDispatch, useSelector} from 'react-redux';
 
-const client = new ApolloClient({
-  request: (operation) => {
-    const token = localStorage.getItem('id_token')
-    operation.setContext({
-      headers: {
-        authorization: token ? `Bearer ${token}` : ''
+const Cart = () => {
+
+  const state = useSelector ((state) => {
+    return state;
+  });
+
+  const dispatch = useDispatch();
+
+  const stripePromise = loadStripe('pk_test_TYooMQauvdEDq54NiTphI7jx');
+
+  const [getCheckout, { data }] = useLazyQuery(QUERY_CHECKOUT);
+
+  useEffect(() => {
+    if (data) {
+      stripePromise.then((res) => {
+        res.redirectToCheckout({ sessionId: data.checkout.session })
+      })
+    }
+  }, [data]);
+
+  useEffect(() => {
+    async function getCart() {
+      const cart = await idbPromise('cart', 'get');
+      dispatch({ type: ADD_MULTIPLE_TO_CART, products: [...cart] });
+    };
+    if (!state.cart.length) {
+      getCart();
+    }
+  }, [state.cart.length, dispatch]);
+
+
+  function toggleCart() {
+    dispatch({ type: TOGGLE_CART });
+  }
+
+  function calculateTotal() {
+    let sum = 0;
+    state.cart.forEach(item => {
+      sum += item.price * item.purchaseQuantity;
+    });
+    return sum.toFixed(2);
+  }
+
+  function submitCheckout() {
+    const productIds = [];
+    state.cart.forEach((item) => {
+      for (let i = 0; i < item.purchaseQuantity; i++) {
+        productIds.push(item._id);
       }
-    })
-  },
-  uri: '/graphql',
-})
+    });
 
-function App() {
+    getCheckout ({
+      variables: { products: productIds }
+    });
+  }
+
+  if (!state.cartOpen) {
+    return (
+      <div className="cart-closed" onClick={toggleCart}>
+        <span
+          role="img"
+          aria-label="trash">🛒</span>
+      </div>
+    );
+  }
+
   return (
-    <ApolloProvider client={client}>
-      <Router>
+    <div className="cart">
+      <div className="close" onClick={toggleCart}>[close]</div>
+      <h2>Shopping Cart</h2>
+      {state.cart.length ? (
         <div>
-          <Provider store={store}>
-            <Nav />
-            <Switch>
-              <Route exact path="/" component={Home} />
-              <Route exact path="/login" component={Login} />
-              <Route exact path="/signup" component={Signup} />
-              <Route exact path="/success" component={Success} />
-              <Route exact path="/orderHistory" component={OrderHistory} />
-              <Route exact path="/products/:id" component={Detail} />
-              <Route component={NoMatch} />
-            </Switch>
-          </ Provider>
+          {state.cart.map(item => (
+            <CartItem key={item._id} item={item} />
+          ))}
+
+          <div className="flex-row space-between">
+            <strong>Total: ${calculateTotal()}</strong>
+
+            {
+              Auth.loggedIn() ?
+                <button onClick={submitCheckout}>
+                  Checkout
+                </button>
+                :
+                <span>(log in to check out)</span>
+            }
+          </div>
         </div>
-      </Router>
-    </ApolloProvider>
-
+      ) : (
+          <h3>
+            <span role="img" aria-label="shocked">
+              😱
+          </span>
+          You haven't added anything to your cart yet!
+          </h3>
+        )}
+    </div>
   );
-}
+};
 
-export default App;
+export default Cart;
